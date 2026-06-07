@@ -1,6 +1,6 @@
 import {assertWrap, check} from '@augment-vir/assert';
 import {stringify} from '@augment-vir/common';
-import {DateUnit, oneIndexedDateUnits} from '@date-vir/duration';
+import {DateUnit, type Hour, type Minute, type Second, oneIndexedDateUnits} from '@date-vir/duration';
 import {checkValidShape, defineShape, exactShape, unionShape} from 'object-shape-tester';
 import {createFullDate} from '../full-date/create-full-date.js';
 import {type FullDate} from '../full-date/full-date-shape.js';
@@ -93,6 +93,17 @@ export function getStartDate<const SpecificTimezone extends Timezone>(
                 days: -1,
             },
         );
+    } else if (unit === DateUnit.Day) {
+        // Fast path: start-of-day is just the same date with time fields zeroed.
+        // Midnight is valid on every calendar day in every timezone (DST transitions
+        // occur at 2 AM, never midnight), so no Luxon round-trip is needed.
+        return {
+            ...date,
+            hour: 0 as Hour,
+            minute: 0 as Minute,
+            second: 0 as Second,
+            millisecond: 0,
+        };
     } else {
         return createFullDate(toLuxonDateTime(date).startOf(unit), date.timezone);
     }

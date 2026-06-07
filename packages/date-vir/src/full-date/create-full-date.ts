@@ -26,7 +26,28 @@ import {parseDateString} from './string-parsing.js';
  *
  * @throws Error: if a valid date cannot be created.
  */
+/**
+ * Cache for {@link createFullDateInUserTimezone} keyed on millisecond timestamp.
+ * Safe because `userTimezone` is a constant during a session, so same ms → same FullDate.
+ * FIFO eviction keeps memory bounded.
+ */
+const userTzCache = new Map<number, FullDate>();
+const USER_TZ_CACHE_MAX = 512;
+
 export function createFullDateInUserTimezone(dateLike: Readonly<DateLike>): FullDate {
+    // Fast path: numeric and Date inputs have a stable ms key.
+    if (dateLike instanceof Date || typeof dateLike === 'number') {
+        const ms = dateLike instanceof Date ? dateLike.getTime() : dateLike;
+        const cached = userTzCache.get(ms);
+        if (cached) return cached;
+        const result = createFullDate(dateLike, userTimezone);
+        if (userTzCache.size >= USER_TZ_CACHE_MAX) {
+            // Evict the oldest entry (Map iteration order = insertion order).
+            userTzCache.delete(userTzCache.keys().next().value!);
+        }
+        userTzCache.set(ms, result);
+        return result;
+    }
     return createFullDate(dateLike, userTimezone);
 }
 
